@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}繰り返し支出設定{% endblock %}
+
+{% block content %}
+<h2>繰り返し支出（毎月）</h2>
+
+<section>
+  <h3>登録済み</h3>
+  {% if recs %}
+  <ul>
+    {% for r in recs %}
+    <li>
+  毎月{{ r.day_of_month }}日：{{ r.title }} -{{ r.amount }}円
+  （{{ r.start_date }} 〜 {% if r.end_date %}{{ r.end_date }}{% else %}無期限{% endif %}）
+  <a href="{{ url_for('delete_recurring', id=r.id) }}" style="color:red;">削除</a>
+</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>まだ登録されていません。</p>
+  {% endif %}
+</section>
+
+<hr>
+
+<section>
+  <h3>新しく追加</h3>
+  <form method="post">
+    <div>
+      <label>内容：</label>
+      <input type="text" name="title" required>
+    </div>
+    <div>
+      <label>金額（円）：</label>
+      <input type="number" name="amount" min="1" required>
+    </div>
+    <div>
+      <label>毎月何日：</label>
+      <input type="number" name="day_of_month" min="1" max="31" required>
+    </div>
+    <div>
+      <label>開始日：</label>
+      <input type="date" name="start_date" required>
+    </div>
+    <div>
+      <label>終了日（任意）：</label>
+      <input type="date" name="end_date">
+    </div>
+    <button type="submit">登録</button>
+  </form>
+</section>
+{% endblock %}

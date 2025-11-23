@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}{{ day.strftime('%Y-%m-%d') }} の家計簿{% endblock %}
+
+{% block content %}
+<h2>{{ day.strftime('%Y年%m月%d日') }}</h2>
+
+<p>この日の合計：{{ total }} 円</p>
+
+<section>
+  <section>
+  <h3>単発の収支</h3>
+  {% if transactions %}
+  <ul>
+    {% for t in transactions %}
+   <li>
+    {{ t.title }}：
+    {% if t.is_expense %}
+      -{{ t.amount }} 円（支出）
+     {% else %}
+     +{{ t.amount }} 円（収入）
+      {% endif %}
+     <a href="{{ url_for('delete_transaction', id=t.id) }}" style="color: red;">削除</a>
+     </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>登録されていません。</p>
+  {% endif %}
+</section>
+
+<section>
+  <h3>繰り返し支出（自動計上）</h3>
+  {% if recurring %}
+  <ul>
+    {% for r in recurring %}
+    <li>{{ r.title }}：-{{ r.amount }} 円（毎月{{ r.day_of_month }}日）</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>該当なし</p>
+  {% endif %}
+</section>
+
+<hr>
+
+<section>
+  <h3>収支を追加</h3>
+  <form method="post">
+    <div>
+      <label>内容：</label>
+      <input type="text" name="title" required>
+    </div>
+    <div>
+     <label>金額（円）：</label>
+     <input type="text" name="amount" inputmode="decimal" required>
+     <div>
+      <label>種類：</label>
+      <select name="kind">
+        <option value="expense">支出</option>
+        <option value="income">収入</option>
+      </select>
+    </div>
+    <button type="submit">保存</button>
+  </form>
+</section>
+{% endblock %}

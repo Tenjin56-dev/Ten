@@ -1,0 +1,174 @@
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+header {
+  background: #3f51b5;
+  color: white;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+header h1 a {
+  color: white;
+  text-decoration: none;
+}
+
+nav a {
+  color: white;
+  margin-left: 10px;
+  text-decoration: none;
+}
+
+main {
+  padding: 16px;
+}
+
+.calendar {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 800px;
+}
+
+.calendar th,
+.calendar td {
+  border: 1px solid #ddd;
+  width: 14.28%;
+  height: 80px;
+  vertical-align: top;
+  padding: 4px;
+  font-size: 12px;
+}
+
+.calendar td a {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.day-number {
+  font-weight: bold;
+}
+
+.day-total {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.other-month {
+  background: #f4f4f4;
+  color: #999;
+}
+
+.month-nav a {
+  margin-right: 10px;
+}
+
+.week-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.week-table th,
+.week-table td {
+  border: 1px solid #ddd;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+/* 日付セル全体をクリック可能に */
+.day-cell {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.day-cell:hover {
+  background: #e0f0ff; /* ホバー時に薄い色 */
+  cursor: pointer;     /* 指カーソル */
+}
+/* =========================
+   スマホ向けレイアウト調整
+   ========================= */
+@media (max-width: 600px) {
+  body {
+    font-size: 14px;
+  }
+
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  main {
+    padding: 8px;
+  }
+
+  /* カレンダーを少し詰めて、タップしやすく */
+  .calendar {
+    max-width: 100%;
+    font-size: 11px;
+  }
+
+  .calendar th,
+  .calendar td {
+    height: 56px;
+    padding: 2px;
+  }
+
+  .day-number {
+    font-size: 12px;
+  }
+
+  .day-total {
+    font-size: 10px;
+  }
+
+  /* 日付セル全体をタップしやすく */
+  .day-cell {
+    padding: 6px;
+  }
+
+  /* 週表示テーブルもコンパクトに */
+  .week-table {
+    font-size: 11px;
+  }
+
+  .week-table th,
+  .week-table td {
+    padding: 4px 2px;
+  }
+
+  /* フォーム類を画面幅いっぱいに */
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  button {
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+}

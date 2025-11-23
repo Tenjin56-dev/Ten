@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}週表示 - 家計簿{% endblock %}
+
+{% block content %}
+<h2>週表示（{{ start_date.strftime('%Y-%m-%d') }} 〜 {{ end_date.strftime('%Y-%m-%d') }}）</h2>
+
+<table class="week-table">
+  <thead>
+    <tr>
+      <th>日付</th>
+      <th>合計</th>
+      <th>明細</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for info in week_info %}
+    <tr>
+      <td>
+        <a href="{{ url_for('day_view', date_str=info.date.strftime('%Y-%m-%d')) }}">
+          {{ info.date.strftime('%Y-%m-%d') }}
+        </a>
+      </td>
+      <td>{{ info.total }} 円</td>
+      <td>
+        {% for t in info.transactions %}
+          {{ t.title }}（{% if t.is_expense %}-{{ t.amount }}{% else %}+{{ t.amount }}{% endif %}）、 
+        {% endfor %}
+        {% for r in info.recurring %}
+          [毎月]{{ r.title }}（-{{ r.amount }}）
+        {% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

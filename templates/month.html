@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}{{ year }}年{{ month }}月 - 家計簿{% endblock %}
+
+{% block content %}
+<h2>{{ year }}年 {{ month }}月</h2>
+
+<p>この月の合計：{{ month_total }} 円</p>
+
+<div class="month-nav">
+  {# 前の月へのリンク #}
+  <a href="{{ url_for(
+      'month_view',
+      year = (year-1) if month == 1 else year,
+      month = 12 if month == 1 else month-1
+  ) }}">
+    前の月
+  </a>
+
+  {# 次の月へのリンク #}
+  <a href="{{ url_for(
+      'month_view',
+      year = (year+1) if month == 12 else year,
+      month = 1 if month == 12 else month+1
+  ) }}">
+    次の月
+  </a>
+</div>
+
+<table class="calendar">
+  <thead>
+    <tr>
+      <th>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for week in weeks %}
+    <tr>
+      {% for d in week %}
+      <td class="{% if not d.in_month %}other-month{% endif %}">
+  <a class="day-cell" href="{{ url_for('day_view', date_str=d.date.strftime('%Y-%m-%d')) }}">
+    <div class="day-number">{{ d.date.day }}</div>
+    <div class="day-total">
+      {% if d.total != 0 %}
+        {{ d.total }} 円
+      {% endif %}
+    </div>
+  </a>
+</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+
