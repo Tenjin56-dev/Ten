@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>新規登録</title>
+</head>
+<body>
+    <h1>ユーザー新規登録</h1>
+
+    <form method="post" action="{{ url_for('register') }}">
+        <div>
+            <label for="username">ユーザー名</label><br>
+            <input type="text" id="username" name="username" required>
+        </div>
+
+        <div>
+            <label for="email">メールアドレス</label><br>
+            <input type="email" id="email" name="email" required>
+        </div>
+
+        <div>
+            <label for="password">パスワード</label><br>
+            <input type="password" id="password" name="password" required>
+        </div>
+
+        <button type="submit">登録</button>
+    </form>
+
+    <p><a href="{{ url_for('login') }}">ログインはこちら</a></p>
+</body>
+</html>

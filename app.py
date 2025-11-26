@@ -13,15 +13,19 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
 # SQLite を使ったローカル保存設定
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///kakeibo.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///kakeibo_v2.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+with app.app_context():
+    db.create_all()
+
 
 # ユーザー情報（ログイン用）
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
+    username = db.Column(db.String(50), nullable=False)  # ★これを必ず追加
     password_hash = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -33,20 +37,23 @@ class Transaction(db.Model):
     amount = db.Column(db.Integer, nullable=False)  # 円
     is_expense = db.Column(db.Boolean, nullable=False)  # True=支出, False=収入
     title = db.Column(db.String(200), nullable=False)
+    # ★ 追加
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
     def sign_amount(self):
         return -self.amount if self.is_expense else self.amount
 
 
-# 毎月の繰り返し支出（毎月◯日のみ）
+# 毎月の繰り返し支出
 class MonthlyRecurring(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)  # ★追加
     day_of_month = db.Column(db.Integer, nullable=False)  # 1〜31
     amount = db.Column(db.Integer, nullable=False)
     title = db.Column(db.String(200), nullable=False)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=True)
+    # ★ 追加
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
 with app.app_context():
     db.create_all()
@@ -89,35 +96,25 @@ def index():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
+        email = request.form.get("email", "").strip()
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
 
-        if not email or not password:
-            return "メールアドレスとパスワードを入力してください。"
+        if not email or not password or not username:
+            return "メールアドレス・ユーザー名・パスワードを入力してください。"
 
-        # すでに登録済みかチェック
         existing = User.query.filter_by(email=email).first()
         if existing:
             return "そのメールアドレスは既に登録されています。"
 
-        # パスワードをハッシュ化
         password_hash = generate_password_hash(password)
-
-        user = User(email=email, username="", password_hash=password_hash)
+        user = User(email=email, username=username, password_hash=password_hash)
         db.session.add(user)
         db.session.commit()
 
         return redirect(url_for("login"))
 
-    return """
-    <h1>ユーザー登録</h1>
-    <form method="post">
-        <input type="email" name="email" placeholder="メールアドレス" required><br>
-        <input type="password" name="password" placeholder="パスワード" required><br>
-        <button type="submit">登録</button>
-    </form>
-    """
-
+    return render_template("register.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -153,7 +150,7 @@ def logout():
 
 
 # 月表示
-from sqlalchemy import or_  # ← ファイルの先頭の import 群に追加しておく
+from sqlalchemy import or_
 
 @app.route("/month")
 @login_required
@@ -175,51 +172,36 @@ def month_view():
     end = date(year, month, last_day)
 
     # ① 単発トランザクションをまとめて取得（クエリ1回）
-       # ここから下は今まで通りでOK（GET用）
     user_id = session["user_id"]
-
     transactions = Transaction.query.filter(
         Transaction.user_id == user_id,
-        Transaction.date == d,
-    ).order_by(Transaction.id.desc()).all()
+        Transaction.date >= start,
+        Transaction.date <= end,
+    ).all()
 
-    recurring = get_recurring_for_date(d)
+    daily_totals = {}
 
-    total = sum(t.sign_amount() for t in transactions)
-    for r in recurring:
-        total -= r.amount
-
-    return render_template(
-        "day.html",
-        day=d,
-        transactions=transactions,
-        recurring=recurring,
-        total=total
-    )
-
-
-    # 単発分を日別に合計
+    # ② 単発分を日別に合計
     for t in transactions:
         daily_totals.setdefault(t.date, 0)
         daily_totals[t.date] += t.sign_amount()
 
-    # ② この月に関係する繰り返し支出をまとめて取得（クエリ1回）
+    # ③ この月に関係する繰り返し支出をまとめて取得（クエリ1回）
     recurring_all = MonthlyRecurring.query.filter(
+        MonthlyRecurring.user_id == user_id,
         MonthlyRecurring.start_date <= end,
         or_(MonthlyRecurring.end_date == None, MonthlyRecurring.end_date >= start)
     ).all()
 
-    # 繰り返し支出を、該当する各日に足し込む
+    # ④ 繰り返し支出を、該当する各日に足し込む
     for r in recurring_all:
-        # この月に存在しうる日付だけを見る
         day = r.day_of_month
         if 1 <= day <= last_day:
             d = date(year, month, day)
-            # start〜end の範囲に入っていることは filter で保証済み
             daily_totals.setdefault(d, 0)
             daily_totals[d] -= r.amount  # 支出なのでマイナス
 
-    # 週ごとの2次元配列に整形（テンプレート用）
+    # （以下、weeks の計算と month_total の計算は元のままでOK）
     weeks = []
     week = []
     for d in month_dates:
@@ -234,7 +216,6 @@ def month_view():
     if week:
         weeks.append(week)
 
-    # 月全体の合計
     month_total = sum(
         daily_totals.get(date(year, month, day), 0)
         for day in range(1, last_day + 1)
@@ -245,7 +226,7 @@ def month_view():
         year=year,
         month=month,
         weeks=weeks,
-        month_total=month_total
+        month_total=month_total,
     )
 
 
