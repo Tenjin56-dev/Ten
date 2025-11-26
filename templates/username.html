@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <title>ユーザー名の変更</title>
+  </head>
+  <body>
+    <h1>ユーザー名の変更</h1>
+
+    {% if error %}
+      <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="post">
+      <p>
+        現在のユーザー名：
+        {{ current_username or "（未設定）" }}
+      </p>
+      <p>
+        <input
+          type="text"
+          name="username"
+          value="{{ current_username or '' }}"
+          placeholder="新しいユーザー名を入力"
+          required
+        >
+      </p>
+      <p>
+        <button type="submit">変更する</button>
+      </p>
+    </form>
+
+    <p><a href="{{ url_for('month_view') }}">月表示に戻る</a></p>
+  </body>
+</html>
+

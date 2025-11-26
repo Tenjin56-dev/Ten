@@ -20,6 +20,9 @@
 
 <p>この月の合計：{{ month_total }} 円</p>
 
+<a href="{{ url_for('change_username') }}">ユーザー名を変更</a>
+
+
 <div class="month-nav">
   {# 前の月へのリンク #}
   <a href="{{ url_for(
