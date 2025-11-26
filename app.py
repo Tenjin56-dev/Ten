@@ -97,12 +97,12 @@ class User(db.Model):
 
 
         if not email or not password:
-            return "メールアドレスとパスワードを入力してください。"
+         return "メールアドレスとパスワードを入力してください。"
 
         # すでに登録済みかチェック
         existing = User.query.filter_by(email=email).first()
         if existing:
-            return "そのメールアドレスは既に登録されています。"
+         return "そのメールアドレスは既に登録されています。"
 
         # パスワードをハッシュ化
         password_hash = generate_password_hash(password)

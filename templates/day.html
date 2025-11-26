@@ -1,3 +1,16 @@
+<body>
+  <header>
+    {% if session.get("user_id") %}
+      ログイン中：{{ session.get("user_email") }}
+      <a href="{{ url_for('logout') }}">ログアウト</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">ログイン</a>
+      <a href="{{ url_for('register') }}">新規登録</a>
+    {% endif %}
+  </header>
+
+  <!-- ここから元々のカレンダーのHTML -->
+
 {% extends "base.html" %}
 
 {% block title %}{{ day.strftime('%Y-%m-%d') }} の家計簿{% endblock %}

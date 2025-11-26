@@ -1,0 +1,10 @@
+class Transaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)  # ★追加
+    date = db.Column(db.Date, nullable=False)
+    amount = db.Column(db.Integer, nullable=False)  # 円
+    is_expense = db.Column(db.Boolean, nullable=False)  # True=支出, False=収入
+    title = db.Column(db.String(200), nullable=False)
+
+    def sign_amount(self):
+        return -self.amount if self.is_expense else self.amount
