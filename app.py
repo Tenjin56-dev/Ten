@@ -17,8 +17,6 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///kakeibo.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
-db = SQLAlchemy(app)
-
 
 # ユーザー情報（ログイン用）
 class User(db.Model):
@@ -88,13 +86,6 @@ def index():
     today = date.today()
     return redirect(url_for("month_view", year=today.year, month=today.month))
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    username = db.Column(db.String(50), nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -160,10 +151,6 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
-@app.route("/")
-def index():
-    today = date.today()
-    return redirect(url_for("month_view", year=today.year, month=today.month))
 
 # 月表示
 from sqlalchemy import or_  # ← ファイルの先頭の import 群に追加しておく
@@ -188,21 +175,28 @@ def month_view():
     end = date(year, month, last_day)
 
     # ① 単発トランザクションをまとめて取得（クエリ1回）
+       # ここから下は今まで通りでOK（GET用）
     user_id = session["user_id"]
 
- transactions = Transaction.query.filter(
-    Transaction.user_id == user_id,
-    Transaction.date >= start,
-    Transaction.date <= end,
- ).all()
+    transactions = Transaction.query.filter(
+        Transaction.user_id == user_id,
+        Transaction.date == d,
+    ).order_by(Transaction.id.desc()).all()
 
- recurring_all = MonthlyRecurring.query.filter(
-    MonthlyRecurring.user_id == user_id,
-    MonthlyRecurring.start_date <= end,
-    or_(MonthlyRecurring.end_date == None, MonthlyRecurring.end_date >= start),
- ).all()
+    recurring = get_recurring_for_date(d)
 
-    daily_totals = {}
+    total = sum(t.sign_amount() for t in transactions)
+    for r in recurring:
+        total -= r.amount
+
+    return render_template(
+        "day.html",
+        day=d,
+        transactions=transactions,
+        recurring=recurring,
+        total=total
+    )
+
 
     # 単発分を日別に合計
     for t in transactions:
@@ -254,11 +248,6 @@ def month_view():
         month_total=month_total
     )
 
- @app.route("/month")
- @login_required
- def month_view():
-    today = date.today()
-    return redirect(url_for("month_view", year=today.year, month=today.month))
 
 # 日表示
 @app.route("/day/<string:date_str>", methods=["GET", "POST"])
@@ -266,29 +255,38 @@ def month_view():
 def day_view(date_str):
     d = datetime.strptime(date_str, "%Y-%m-%d").date()
 
+    # POST（新規登録）
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        amount_str = request.form.get("amount", "").strip()
+        kind = request.form.get("kind")  # "expense" or "income"
+
+        # 入力チェック
+        if (not title) or (not amount_str) or (not amount_str.isdecimal()) \
+                or kind not in ("expense", "income"):
+            return redirect(url_for("day_view", date_str=date_str))
+
         amount = int(amount_str)
-     is_expense = (kind == "expense")
+        is_expense = (kind == "expense")
 
-     t = Transaction(
-        user_id=session["user_id"],  # ★追加
-        date=d,
-        amount=amount,
-        is_expense=is_expense,
-        title=title,
-     )
-     db.session.add(t)
-     db.session.commit()
-
+        t = Transaction(
+            user_id=session["user_id"],
+            date=d,
+            amount=amount,
+            is_expense=is_expense,
+            title=title,
+        )
+        db.session.add(t)
+        db.session.commit()
 
         return redirect(url_for("day_view", date_str=date_str))
 
-    # ↓ここから下は今まで通りでOK（GET用）
-   user_id = session["user_id"]
-
- transactions = Transaction.query.filter(
-    Transaction.user_id == user_id,
-    Transaction.date == d,
- ).order_by(Transaction.id.desc()).all()
+    # GET（表示）
+    user_id = session["user_id"]
+    transactions = Transaction.query.filter(
+        Transaction.user_id == user_id,
+        Transaction.date == d,
+    ).order_by(Transaction.id.desc()).all()
 
     recurring = get_recurring_for_date(d)
 
@@ -301,16 +299,10 @@ def day_view(date_str):
         day=d,
         transactions=transactions,
         recurring=recurring,
-        total=total
+        total=total,
     )
- @app.route("/day/<string:date_str>", methods=["GET", "POST"])
- @login_required
- def day_view(date_str):
-    today = date.today()
-    return redirect(url_for("month_view", year=today.year, month=today.month))
 
-
-# 週表示（start=YYYY-MM-DD）
+# 週表示 (start=YYYY-MM-DD)
 @app.route("/week")
 @login_required
 def week_view():
@@ -323,23 +315,25 @@ def week_view():
         # 日曜スタートの週
         start_date = today - timedelta(days=(weekday + 1) % 7)
 
+    # この週7日分のリスト
     days = [start_date + timedelta(days=i) for i in range(7)]
 
     user_id = session["user_id"]
 
- transactions = Transaction.query.filter(
-    Transaction.user_id == user_id,
-    Transaction.date >= days[0],
-    Transaction.date <= days[-1],
- ).all()
+    # ユーザーの週次データを取得
+    transactions = Transaction.query.filter(
+        Transaction.user_id == user_id,
+        Transaction.date >= days[0],
+        Transaction.date <= days[-1],
+    ).all()
 
-
-
+    # 日付ごとに分類
     by_date = {d: [] for d in days}
     for t in transactions:
         if t.date in by_date:
             by_date[t.date].append(t)
 
+    # テンプレートへ渡す情報を作成
     week_info = []
     for d in days:
         trans = by_date[d]
@@ -349,68 +343,66 @@ def week_view():
             "date": d,
             "transactions": trans,
             "recurring": recs,
-            "total": total
+            "total": total,
         })
 
     return render_template(
         "week.html",
         week_info=week_info,
         start_date=days[0],
-        end_date=days[-1]
+        end_date=days[-1],
     )
- @app.route("/week")
- @login_required
- def week_view():
-    today = date.today()
-    return redirect(url_for("month_view", year=today.year, month=today.month))
-
 
 # 繰り返し支出の一覧・追加
 @app.route("/recurring", methods=["GET", "POST"])
 @login_required
 def recurring_view():
+    if request.method == "POST":
+        title = request.form.get("title")
+        amount = request.form.get("amount", type=int)
+        day_of_month = request.form.get("day_of_month", type=int)
+        start_str = request.form.get("start_date")
+        end_str = request.form.get("end_date")
 
         if title and amount and day_of_month:
-        start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-        end_date = datetime.strptime(end_str, "%Y-%m-%d").date() if end_str else None
-        r = MonthlyRecurring(
-            user_id=session["user_id"],  # ★追加
-            title=title,
-            amount=amount,
-            day_of_month=day_of_month,
-            start_date=start_date,
-            end_date=end_date,
-         )
-         db.session.add(r)
-         db.session.commit()
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date() if start_str else date.today()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date() if end_str else None
 
+            r = MonthlyRecurring(
+                user_id=session["user_id"],  # ★ユーザーごと
+                title=title,
+                amount=amount,
+                day_of_month=day_of_month,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            db.session.add(r)
+            db.session.commit()
 
         return redirect(url_for("recurring_view"))
 
     user_id = session["user_id"]
- recs = MonthlyRecurring.query.filter_by(user_id=user_id)\
-    .order_by(MonthlyRecurring.day_of_month).all()
+    recs = MonthlyRecurring.query.filter_by(user_id=user_id).order_by(
+        MonthlyRecurring.day_of_month
+    ).all()
 
     return render_template("recurring.html", recs=recs)
 
-from flask import request  # まだ無ければ、ファイルの先頭の import 群に追加
 
- @app.route("/recurring", methods=["GET", "POST"])
- @login_required
- def recurring_view():
-     today = date.today()
-    return redirect(url_for("month_view", year=today.year, month=today.month))
+from flask import request  # まだ無ければ、ファイルの先頭の import 群に
 
 # 単発の収支削除
 @app.route("/delete/<int:id>")
 @login_required
 def delete_transaction(id):
-    user_id = session["user_id"]
-    t = Transaction.query.filter_by(id=id, user_id=user_id).first()
+    t = Transaction.query.get(id)
     if t:
         db.session.delete(t)
         db.session.commit()
-    return redirect( ... )  # 元のままでOK
+
+    # 直前のページに戻る（無ければ month_view へ）
+    return redirect(request.referrer or url_for("month_view"))
+
 
 # 繰り返し支出削除
 @app.route("/delete_recurring/<int:id>")
@@ -425,9 +417,4 @@ if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
- @app.route("/delete/<int:id>")
- @login_required
- def delete_transaction(id):
-    today = date.today()
-    return redirect(url_for("month_view", year=today.year, month=today.month))
 
