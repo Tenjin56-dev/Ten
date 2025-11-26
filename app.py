@@ -91,29 +91,33 @@ def index():
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    username = db.Column(db.String(50), nullable=False)  # ★追加
+    username = db.Column(db.String(50), nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
 
         if not email or not password:
-         return "メールアドレスとパスワードを入力してください。"
+            return "メールアドレスとパスワードを入力してください。"
 
         # すでに登録済みかチェック
         existing = User.query.filter_by(email=email).first()
         if existing:
-         return "そのメールアドレスは既に登録されています。"
+            return "そのメールアドレスは既に登録されています。"
 
         # パスワードをハッシュ化
         password_hash = generate_password_hash(password)
 
-        user = User(email=email, password_hash=password_hash)
+        user = User(email=email, username="", password_hash=password_hash)
         db.session.add(user)
         db.session.commit()
 
         return redirect(url_for("login"))
 
-    # GET のとき
     return """
     <h1>ユーザー登録</h1>
     <form method="post">
@@ -121,8 +125,8 @@ class User(db.Model):
         <input type="password" name="password" placeholder="パスワード" required><br>
         <button type="submit">登録</button>
     </form>
-    <p><a href="/login">ログインはこちら</a></p>
     """
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
