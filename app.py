@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 import calendar
 
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session,abort
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import or_
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -384,6 +384,64 @@ def delete_transaction(id):
     # 直前のページに戻る（無ければ month_view へ）
     return redirect(request.referrer or url_for("month_view"))
 
+from flask import abort, render_template, request, redirect, url_for, session
+
+@app.route("/username", methods=["GET", "POST"])
+@login_required
+def change_username():
+    # 1. セッションに user_id が無ければログイン画面へ
+    user_id = session.get("user_id")
+    if not user_id:
+        # 念のためセッションをクリアしてログインへ
+        session.clear()
+        return redirect(url_for("login"))
+
+    # 2. DB からユーザーを取得
+    user = User.query.get(user_id)
+
+    # 3. もし該当ユーザーが見つからなければ、
+    #    古いセッションだと考えてログインし直してもらう
+    if user is None:
+        session.clear()
+        return redirect(url_for("login"))
+
+    # ここまで来たら「本当に存在するログイン中ユーザー」
+
+    if request.method == "POST":
+        new_name = request.form.get("username", "").strip()
+
+        if not new_name:
+            error = "ユーザー名を入力してください。"
+            return render_template(
+                "username.html",
+                current_username=user.username,
+                error=error,
+            )
+
+        duplicate = User.query.filter(
+            User.id != user.id,
+            User.username == new_name,
+        ).first()
+        if duplicate:
+            error = "そのユーザー名は既に使われています。"
+            return render_template(
+                "username.html",
+                current_username=user.username,
+                error=error,
+            )
+
+        user.username = new_name
+        db.session.commit()
+
+        return redirect(url_for("month_view"))
+
+    # GET のとき
+    return render_template(
+        "username.html",
+        current_username=user.username,
+        error=None,
+    )
+
 
 # 繰り返し支出削除
 @app.route("/delete_recurring/<int:id>")
@@ -398,4 +456,5 @@ if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
